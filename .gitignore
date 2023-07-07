@@ -1,0 +1,5 @@
+*.db
+*.text
+*.docx
+.vscode
+*.json
