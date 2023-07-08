@@ -2,6 +2,8 @@
 import sqlite3
 import time
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import StaleElementReferenceException
+
 
 # Finds all jobs with the query
 def search_jobs(driver, query, job_queue):
@@ -21,16 +23,19 @@ def search_jobs(driver, query, job_queue):
         # Retrieve the job URLs from search results
         search_results = driver.find_elements(By.CSS_SELECTOR, "div.g")
         for result in search_results:
-            link_element = result.find_element(By.CSS_SELECTOR, "a")
-            url = link_element.get_attribute("href")
-            if "boards.greenhouse.io" in url:
-                connection = sqlite3.connect('logged_urls.db')
-                cursor = connection.cursor()
-                cursor.execute("SELECT url FROM logged_urls WHERE url = ?", (url,))
-                if cursor.fetchone() is None:
-                    job_queue.put(url)
-                    print("New Results added:", url)
-                    connection.close()
+            try:
+                link_element = result.find_element(By.CSS_SELECTOR, "a")
+                url = link_element.get_attribute("href")
+                if "boards.greenhouse.io" in url:
+                    connection = sqlite3.connect('logged_urls.db')
+                    cursor = connection.cursor()
+                    cursor.execute("SELECT url FROM logged_urls WHERE url = ?", (url,))
+                    if cursor.fetchone() is None:
+                        job_queue.put(url)
+                        print("New Results added:", url)
+                        connection.close()
+            except StaleElementReferenceException:
+                continue
 
         # Check if we have reached the bottom of the page
         new_height = driver.execute_script("return document.body.scrollHeight")

@@ -1,12 +1,13 @@
 import traceback
-import time
 from threading import Thread
 from queue import Queue
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from database import create_databases
 from search import search_jobs
 from log_utils import log_jobs
+from filter import filter_jobs
+from datetime import date, timedelta
+import report
 
 def main():
     try:
@@ -17,33 +18,44 @@ def main():
         driver.implicitly_wait(10)  # Add an implicit wait to handle page loading
 
         # Input for Google query
+        # Calculate the date range
+        end_date = date.today()
+        start_date = end_date - timedelta(days=7)
+
+        # Format the dates in YYYY-MM-DD format
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
         site = "greenhouse.io"
-        job = "Event Planner"
-        location = "Orlando"
-        time_filter = "last 7 days"
-        query = 'site:' + site + ' "' + job + '" "' + location + '" ' + time_filter
+        job = "Software Developer"
+        location = "orlando"
+        query = 'site:' + site + ' "' + job + '" "' + location + '" daterange:' + start_date_str + '..' + end_date_str
         print(query)
 
-        # Create a queue to store job URLs
+
+        # Queue Creation 
         job_queue = Queue()
+        logged_queue = Queue()
 
-        # Create a set to store logged URLs
-        logged_urls = set()
-
-        # Create and start the search thread
+        # Creating and starting threads
         search_thread = Thread(target=search_jobs, args=(driver, query, job_queue))
         search_thread.start()
 
-        # Create and start the log thread
-        log_thread = Thread(target=log_jobs, args=(job_queue, logged_urls, query))
+        log_thread = Thread(target=log_jobs, args=(job_queue, logged_queue, query))
         log_thread.start()
 
-        # Wait for the search thread to finish
-        search_thread.join()
+     
 
-        # Wait for the log thread to finish
+        #Threads are finishing and queues are being capped
+        search_thread.join()
         job_queue.put(None)
         log_thread.join()
+
+        #Phase two: filter
+        filter_thread = Thread(target=filter_jobs, args=(driver, logged_queue, site, job, location))
+        filter_thread.start()
+
+        logged_queue.put(None)
+        filter_thread.join()
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
@@ -52,7 +64,9 @@ def main():
     finally:
         # Close the web driver
         driver.quit()
-        print("Report")
+        # Print the report
+        report.print_filtered_urls()
+        report.print_logged_urls()
 
 if __name__ == "__main__":
     main()

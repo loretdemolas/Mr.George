@@ -2,7 +2,7 @@
 import sqlite3
 
 
-def log_jobs(job_queue, logged_urls, query):
+def log_jobs(job_queue, logged_queue, query):
     connection = sqlite3.connect('logged_urls.db')
     cursor = connection.cursor()
 
@@ -16,6 +16,6 @@ def log_jobs(job_queue, logged_urls, query):
         connection.commit()
 
         # Add the URL to the logged URLs set
-        logged_urls.add(job_url)
+        logged_queue.put(job_url)
 
     connection.close()
